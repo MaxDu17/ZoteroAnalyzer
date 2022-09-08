@@ -23,13 +23,34 @@ item_dict = {k : v for (k, v) in res.fetchall()} #mapping between item type id a
 res = cur.execute("SELECT wordID, word from fulltextWords")
 word_dict = {k : v for (k, v) in res.fetchall()} # mapping between word id and actual words
 
-# TODO: map from item id to metadata, etc
+res = cur.execute("SELECT collectionID, collectionName from collections")
+collectionID_to_name = {k : v for (k, v) in res.fetchall()} #mapping between the collection id to the name of the collection
+name_to_collectionID = {v : k for k, v in collectionID_to_name.items()}
 
-def get_word_counts(cur, stopwords = None):
-    res = cur.execute("SELECT wordID from fulltextItemWords") #gets all the words in a dump
-    word_dump = [k[0] for k in res.fetchall()]
+res = cur.execute("SELECT itemID, collectionID from collectionItems")
+collection_to_items = {} #typical: given a folder, what is inside?
+items_to_collection = {} #inverted: given an element, what are the folders?
+
+# try 45
+
+
+for (item, collection) in res.fetchall():
+    if item not in items_to_collection:
+        items_to_collection[item] = list()
+    if collection not in collection_to_items:
+        collection_to_items[collection] = list()
+    items_to_collection[item].append(collection)
+    collection_to_items[collection].append(item)
+
+def get_word_counts(cur, stopwords = None, collection_index = None):
+    res = cur.execute("SELECT wordID, itemID from fulltextItemWords") #gets all the words in a dump
     word_counts = {}
-    for word in tqdm.tqdm(word_dump):
+    for (word, item) in tqdm.tqdm(res.fetchall()):
+        if 45 in items_to_collection.get(item, []):
+            print('yes')
+        # if collection_index is not None and item not in collection_to_items[collection_index]:
+        #     print(item)
+        #     continue
         if word_dict[word] not in word_counts:
             word_counts[word_dict[word]] = 0
         word_counts[word_dict[word]] += 1
@@ -49,7 +70,17 @@ def get_attachment_counts(cur):
     ordered_item_counts = collections.OrderedDict(sorted(item_counts.items()))
     return ordered_item_counts
 
-sorted_counts = get_word_counts(cur, STOPWORDS)
+def calculate_total_pages(cur):
+    res = cur.execute("SELECT totalPages from fulltextItems")  # gets all the words in a dump
+    items = [k[0] for k in res.fetchall() if k[0] is not None]
+    total = 0
+    for item in items:
+        total += item
+    return total
+
+print(calculate_total_pages(cur))
+
+sorted_counts = get_word_counts(cur, STOPWORDS) #, collection_index = name_to_collectionID["Whale (already indexed)"])
 pretty_print(sorted_counts, 100)
 
 while True:
